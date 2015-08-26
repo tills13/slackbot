@@ -1,0 +1,4 @@
+config.js
+jira.js
+*.coffee
+node_modules/
