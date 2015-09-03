@@ -1,4 +1,3 @@
-config.js
-jira.js
+/config/
 *.coffee
 node_modules/
