@@ -2,22 +2,22 @@ var request = require('request');
 var config = require('../config/jira');
 
 var JiraIntegration = function(context) {
-	this.slack = context.slack;
+    this.slack = context.slack;
     this.logger = context.logger;
     this.name = 'JIRA';
-	this.recentIssues = [];
+    this.recentIssues = [];
 
-	this.slack.on('message', this.onMessage.bind(this));
+    this.slack.on('message', this.onMessage.bind(this));
 
-	this.config = config;
+    this.config = config;
 }
 
 JiraIntegration.prototype.onMessage = function(message) {
-	var channel = this.slack.getChannelGroupOrDMByID(message.channel);
-	var user = this.slack.getUserByID(message.user);
-	var text = message.text;
+    var channel = this.slack.getChannelGroupOrDMByID(message.channel);
+    var user = this.slack.getUserByID(message.user);
+    var text = message.text;
 
-	regex = new RegExp('((?:' + this.config.projects.join('|') + ')(?:-| )?\\d+)', 'ig');
+    regex = new RegExp('((?:' + this.config.projects.join('|') + ')(?:-| )?\\d+)', 'ig');
 
     if (issues = text.match(regex)) {
         this.logger.info("found {0} in {1}'s comment".format(issues.join(','), user.name));
