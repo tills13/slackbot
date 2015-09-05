@@ -1,0 +1,29 @@
+{
+  "name": "rbmbot",
+  "version": "1.0.0",
+  "description": "a series of helpful tools which interact with slack",
+  "main": "rbmbot.js",
+  "dependencies": {
+    "extend": "^3.0.0",
+    "later": "^1.1.6",
+    "log": "^1.4.0",
+    "underscore": "^1.8.3",
+    "btoa": "^1.1.2",
+    "request": "^2.61.0",
+    "ws": "^0.8.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tills13/slackbot.git"
+  },
+  "author": "Tyler",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tills13/slackbot/issues"
+  },
+  "homepage": "https://github.com/tills13/slackbot#readme"
+}

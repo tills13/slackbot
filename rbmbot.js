@@ -6,12 +6,12 @@ var config = require('./config/config');
     var Slack = require('./slack/client');
     var f = require('./functions');
     var Log = require('Log');
-    var later = require('later');
 
     var RbmBot = function() {
         this.config = {};
         this.slack = new Slack(process.env.SLACK_BOT_TOKEN || this.config.token, true, true); // token, autoreconnect, automark (whatever that is)
         this.logger = new Log('info');
+        //this.logger.
 
         this.integrations = [];
         this.ready = false;

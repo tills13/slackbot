@@ -1,5 +1,5 @@
 var request = require('request');
-var later = require('later');
+var _ = require('underscore');
 var config = require('../config/challonge');
 
 var ChallongeIntegration = function(context) {
@@ -12,6 +12,7 @@ var ChallongeIntegration = function(context) {
 
     this.activeMatches = [];
     this.completedMatches = [];
+    this.tournaments = null;
     this.tournament = null;
     this.userMap = {};
 
@@ -38,7 +39,7 @@ ChallongeIntegration.prototype = {
 
     update: function() {
         if (!this.context.ready || this.isUpdating) return; // make sure we're connected to slack
-        if (!this.tournament) this.fetchTournaments();
+        if (!this.tournaments) this.fetchTournaments();
         else this.updateTournament();
     },
 
@@ -62,17 +63,19 @@ ChallongeIntegration.prototype = {
                 if (error) {
                     throw "something went wrong fetching tournaments";
                 } else {
-                    if (body.length > 1) {
-                        // need to figure out which one is the latest
-                        this.tournament = body[body.length - 1].tournament;
-                    } else if (body.length == 0) {
+                    if (body.length == 0) {
                         throw "no tournaments found";
                     } else {
-                        this.tournament = body[0].tournament;
+                        this.tournaments = body;
                     }
                 }
 
-                if (this.tournament) this.logger.info("tournament set to: {0}".format(this.tournament.url));
+                if (this.tournaments) this.logger.info("found {0} tournaments: {1}".format(
+                    this.tournaments.length,
+                    _.map(this.tournaments, function(tournament) {
+                        return tournament.tournament.url;
+                    }).join(',')
+                ));
             } catch (e) { this.logger.error("{0}, retrying in {1} second(s)".format(e.message, (this.config.updateFrequency/1000))); }
 
             this.isUpdating = false;
@@ -80,9 +83,13 @@ ChallongeIntegration.prototype = {
     },
 
     updateTournament: function() {
+        this.isUpdating = true;
+        
+        var tournamentId = (this.tournament || this.tournaments[this.tournaments.length - 1].tournament).url;
+
         var options =  {
             method: 'GET',
-            uri: this.getUri('tournament', [this.tournament.id], {
+            uri: this.getUri('tournament', [tournamentId], {
                 include_matches: 1,
                 include_participants: 1
             }),
@@ -93,11 +100,12 @@ ChallongeIntegration.prototype = {
         var req = request(options, function(error, response, body) {
             if (error) {
                 this.logger.error("something went wrong updating tournament");
-                return;
-            } 
+            } else {
+                this.tournament = body.tournament;
+                this.logger.info("updated tournament: {0}".format(this.tournament.url));
+            }
 
-            this.tournament = body.tournament;
-            this.logger.info("updated tournament: {0}".format(this.tournament.url));
+            this.isUpdating = false;
         }.bind(this));
     },
 
@@ -116,22 +124,33 @@ ChallongeIntegration.prototype = {
         if (!this.hasNotifiedOpenTourney && 
              this.tournament.state == 'pending' || 
              this.tournament.state == 'open') {
-            messages.push("Tournament *{0}* now open for signup: {1}".format(this.tournament.name, (this.tournament.sign_up_url || this.tournament.full_challonge_url)));
+            //messages.push("Tournament *{0}* now open for signup: {1}".format(this.tournament.name, (this.tournament.sign_up_url || this.tournament.full_challonge_url)));
             this.hasNotifiedOpenTourney = true;
         }
 
         if (!this.hasNotifiedUnderwayTourney && this.tournament.state == 'underway') {
-            messages.push("Tournament *{0}* is underway: {1}".format(this.tournament.name, this.tournament.full_challonge_url));
+            channel.send("*Tournament `{0}` is underway*: _Follow along at_ {1}\n>>>{2} *Participants Signed Up:*\n_{3}_".format(
+                this.tournament.name,
+                this.tournament.full_challonge_url,
+                this.tournament.participants.length,
+                _.map((this.tournament.participants || []), function(participant) {
+                    participant = participant.participant; // why
+                    return this.getParticipantName(participant.name);
+                }.bind(this)).join('_, _')
+            ));
+            //messages.push("Tournament *{0}* is underway: {1}".format(this.tournament.name, this.tournament.full_challonge_url));
             this.hasNotifiedUnderwayTourney = true;
         }
 
-        console.log("active matches: [{0}]".format(this.activeMatches.join(',')));
-        console.log("complete matches: [{0}]".format(this.completedMatches.join(',')));
+        if (this.context.config.debug) {
+            console.log("active matches: [{0}]".format(this.activeMatches.join(',')));
+            console.log("complete matches: [{0}]".format(this.completedMatches.join(',')));
+        }
 
         var availableMatches = [];
         for (var index = 0; index < (this.tournament.matches || []).length; index++) {
             var match = this.tournament.matches[index].match;
-            console.log(match.id, match.state, match.scores_csv);
+            if (this.context.config.debug) console.log(match.id, match.state, match.scores_csv);
 
             if (match.state == 'open' && this.activeMatches.indexOf(match.id) == -1) {
                 // assume active because we don't actually track 
@@ -189,11 +208,11 @@ ChallongeIntegration.prototype = {
         }
 
         if (messages.length != 0) {
-            channel.send("{0}".format(messages.join('\n')));        
+            //channel.send("{0}".format(messages.join('\n')));        
         }
 
         if (availableMatches.length != 0) {
-            channel.send("*Active or Available Matches*\n>>>{0}".format(availableMatches.join('\n')));  
+            //channel.send("*Active or Available Matches*\n>>>{0}".format(availableMatches.join('\n')));  
         }
     },
 
@@ -231,6 +250,7 @@ ChallongeIntegration.prototype = {
     getParticipantName: function(participant) {
         // the participant object
         if (typeof participant == 'object') {
+            if (participant.participant) participant = participant.participant;
             return (this.userMap[participant.name] || participant.name);
         } else return (this.userMap[participant] || participant);
     }
